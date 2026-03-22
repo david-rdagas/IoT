@@ -9,16 +9,26 @@ Autores: David Rodríguez Dagas
 ========================================
 """
 
+from numpy import linspace
 from utils.noise import add_gaussian_noise
+from utils.sensor2client import prepare_publisher
+import json
+from time import sleep
+from datetime import datetime, timezone, timedelta
+
 
 
 # Valores realistas de presión
+"""
+HACER TRANSFORMADOR DE ALTURA A PRESIÓN PARA QUE SEA MÁS FÁCIL MODIFICARLO
+"""
 PRESSURE_AT_500 = 954.61 #hPa
 PRESSURE_AT_1500 = 845.56
 
 # Valores estadísticos del error normal del sensor
 MEAN = 0
 STANDARD_D = 0.4
+
 
 def baro_start_measure(duration: int, rest_end: int, launch_end: int, apogee_end: int, descent_end: int):
     """
@@ -29,21 +39,50 @@ def baro_start_measure(duration: int, rest_end: int, launch_end: int, apogee_end
         - Apogeo: 1s
         - Descenso 79s
     """
+    # ── 1. Preparar el cliente  ──────────────────────────────────────────
+
+    client = prepare_publisher("s-barometer-01", "rocket/system/s-barometer-01/status")
+
+    # ── 2. Simulación de presión y publicación de datos  ──────────────────────────────────────────
+
+    pressure_on_launch = linspace(PRESSURE_AT_500, PRESSURE_AT_1500, launch_end - rest_end) # Duración del "launch"
+    pressure_on_descent = linspace(PRESSURE_AT_1500, PRESSURE_AT_500, descent_end - apogee_end) # Duración del descenso
     
     for i in range(0, duration + 1):
+        baro_measurement = -1 # Valor de error
+
         if i <= rest_end:
             baro_measurement = add_gaussian_noise(MEAN, STANDARD_D, PRESSURE_AT_500)
-            print(baro_measurement)
-        elif rest_end < i <= rest_end:
-            pass
         elif rest_end < i <= launch_end:
-            pass
+            launch_second = i - rest_end - 1
+            baro_measurement = add_gaussian_noise(MEAN, STANDARD_D, pressure_on_launch[launch_second])
         elif launch_end < i <= apogee_end:
-            pass
+            baro_measurement = add_gaussian_noise(MEAN, STANDARD_D, PRESSURE_AT_1500)
         elif apogee_end < i <= descent_end:
-            pass
+            descent_second = i - apogee_end - 1
+            baro_measurement = add_gaussian_noise(MEAN, STANDARD_D, pressure_on_descent[descent_second])
+
         else:
             print("Simulation fatal error")
+
+        baro_measurement = round(baro_measurement, 4)
+        print(baro_measurement)
+        
+        payload = json.dumps({
+            "device_id": "s-barometer-01",
+            "timestamp": datetime.now(timezone(timedelta(hours=1))).isoformat(),
+            "type": "pressure",
+            "unit": "hPa",
+            "value": baro_measurement
+        })
+
+        client.publish(
+            "rocket/propulsion/s-barometer-01/data",
+            payload,
+            qos=1
+        )
+
+        sleep(1)
 
 
 
