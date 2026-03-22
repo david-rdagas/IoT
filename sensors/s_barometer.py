@@ -35,6 +35,8 @@ def baro_start_measure(duration: int, rest_end: int, launch_end: int, apogee_end
         - Apogeo: 1s
         - Descenso 79s
     """
+    pressure= []
+
     pressure_on_launch = linspace(PRESSURE_AT_500, PRESSURE_AT_1500, launch_end - rest_end) # Duración del "launch"
     pressure_on_descent = linspace(PRESSURE_AT_1500, PRESSURE_AT_500, descent_end - apogee_end) # Duración del descenso
     
@@ -43,11 +45,14 @@ def baro_start_measure(duration: int, rest_end: int, launch_end: int, apogee_end
 
         if i <= rest_end:
             baro_measurement = add_gaussian_noise(MEAN, STANDARD_D, PRESSURE_AT_500)
+
         elif rest_end < i <= launch_end:
             launch_second = i - rest_end - 1
             baro_measurement = add_gaussian_noise(MEAN, STANDARD_D, pressure_on_launch[launch_second])
+
         elif launch_end < i <= apogee_end:
             baro_measurement = add_gaussian_noise(MEAN, STANDARD_D, PRESSURE_AT_1500)
+
         elif apogee_end < i <= descent_end:
             descent_second = i - apogee_end - 1
             baro_measurement = add_gaussian_noise(MEAN, STANDARD_D, pressure_on_descent[descent_second])
@@ -57,6 +62,8 @@ def baro_start_measure(duration: int, rest_end: int, launch_end: int, apogee_end
 
         baro_measurement = round(baro_measurement, 4)
         print(f"El barómetro ha medido: {baro_measurement}hPa en el instante {i}")
+        pressure.append(baro_measurement)
+        print(len(pressure))
         #sleep(1)
 
 
