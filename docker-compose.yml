@@ -51,7 +51,21 @@ services:
     restart: on-failure
     networks:
       - lunaris-internal-network
-  
+# -----------------------------------------------------
+  api:
+    build: ./api
+    depends_on:
+      - influxdb
+    ports:
+      - "5000:5000"
+    environment:
+      - INFLUX_URL=http://influxdb:8086
+      - INFLUX_TOKEN=mi-token-secreto
+      - INFLUX_ORG=esei
+      - INFLUX_BUCKET=iot_data
+    networks:
+      - lunaris-internal-network
+      
 volumes:
   influxdb_data:
 networks:
