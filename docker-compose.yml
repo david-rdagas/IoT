@@ -20,7 +20,38 @@ services:
     restart: on-failure
     networks:
       - lunaris-internal-network
-
+# -----------------------------------------------------
+  influxdb:
+    image: influxdb:2.7
+    ports:
+    - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUX_USER}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUX_PSWD}
+      - DOCKER_INFLUXDB_INIT_ORG=project
+      - DOCKER_INFLUXDB_INIT_BUCKET=lunaris
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUX_TOKEN}
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    networks:
+      - lunaris-internal-network
+# -----------------------------------------------------
+  ingestion:
+    build: ./ingestion
+    depends_on:
+      - mosquitto
+      - influxdb
+    environment:
+      - MQTT_BROKER=mosquitto
+      - INFLUX_URL=http://influxdb:8086
+      - INFLUX_TOKEN=${INFLUX_TOKEN}
+      - INFLUX_ORG=project
+      - INFLUX_BUCKET=lunaris
+    restart: on-failure
+    networks:
+      - lunaris-internal-network
+  
 volumes:
   influxdb_data:
 networks:
