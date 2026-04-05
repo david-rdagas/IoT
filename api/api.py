@@ -1,17 +1,18 @@
-# api.py — API REST con FastAPI (ruta InfluxDB)
-# P6: Mini-Pipeline End-to-End
-from fastapi import FastAPI, Header, HTTPException
 from typing import Optional
 import json
 import os
+import datetime
+from fastapi import FastAPI, Header, HTTPException
 from influxdb_client import InfluxDBClient
 
+
+
+# ── 1. Inicialización de FastAPI ──────────────────────────────────────────
 app = FastAPI(title="IoT Pipeline API", version="1.0")
+API_KEY = os.environ.get("API_KEY", "0000")
 
-# --- API Key (hardcodeada para la práctica) ---
-VALID_API_KEY = "mi-clave-secreta-2026"
 
-# --- Conexión InfluxDB ---
+# ── 2. Conexión a base de datos ──────────────────────────────────────────
 INFLUX_URL = os.environ.get("INFLUX_URL", "http://localhost:8086")
 INFLUX_TOKEN = os.environ.get("INFLUX_TOKEN", "pic-lab-token-2026")
 INFLUX_ORG = os.environ.get("INFLUX_ORG", "esei")
@@ -21,18 +22,90 @@ influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_OR
 query_api = influx_client.query_api()
 
 
-# =============================================
-# Autenticación
-# =============================================
+# ── 3. Comprobación de credenciales ──────────────────────────────────────────
 def verify_api_key(x_api_key: Optional[str] = Header(None)):
     """Verifica que el header X-API-Key está presente y es correcto."""
-    if x_api_key is None or x_api_key != VALID_API_KEY:
+    if x_api_key is None or x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized: API key inválida o ausente")
 
 
-# =============================================
-# GET /devices — lista de dispositivos
-# =============================================
+# ── 4. Endpoints ──────────────────────────────────────────
+"""
+Para nuestro sistema contamos con las siguientes posibles consultas: 
+
+"""
+
+def run_query(flux: str, empty_detail: str) -> list:
+    """Ejecuta una query Flux y lanza 404 si no hay resultados."""
+    try:
+        tables = query_api.query(flux, org=INFLUX_ORG)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error consultando InfluxDB: {e}")
+
+    records = [r for table in tables for r in table.records]
+    if not records:
+        raise HTTPException(status_code=404, detail=empty_detail)
+    return 
+
+def validate_range(from_ts: Optional[str], to_ts: Optional[str]) -> tuple[str, str]:
+    """
+    Valida y normaliza el rango temporal.
+    Acepta formato ISO 8601: 2026-03-01T00:00:00Z
+    Devuelve (start, stop) listos para usar en Flux.
+    """
+    start = from_ts if from_ts else "-1h"   # default: última hora
+    stop  = to_ts   if to_ts   else "now()"
+
+    if from_ts:
+        try:
+            datetime.fromisoformat(from_ts.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="from_ts inválido. Usa formato ISO 8601: 2026-03-01T00:00:00Z"
+            )
+    if to_ts:
+        try:
+            datetime.fromisoformat(to_ts.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="to_ts inválido. Usa formato ISO 8601: 2026-03-01T12:00:00Z"
+            )
+    return start, stop
+
+
+@app.get("/telemetry/temperature")
+def get_temperature(from_ts, to_ts, x_api_key):
+
+    verify_api_key(x_api_key)
+    start, stop = validate_range(from_ts, to_ts)
+
+    flux = f'''
+        from(bucket: "{INFLUX_BUCKET}")
+        |> range(start: {start}, stop: {stop})
+        |> filter(fn: (r) => r._measurement == "s-termometer-01")
+        |> filter(fn: (r) => r._field == "value")
+        |> sort(columns: ["_time"], desc: true)
+    '''
+    records = run_query(flux, "No hay lecturas de temperatura en ese rango")
+
+    return {
+        "sensor": "s-termometer-01",
+        "from": from_ts or "última hora",
+        "to":   to_ts   or "ahora",
+        "count": len(records),
+        "readings": [
+            {
+                "timestamp": str(r.get_time()),
+                "value":     r.get_value(),
+                "unit":      r.values.get("unit", ""),
+            }
+            for r in records
+        ]
+    }
+
+"""
 @app.get("/devices")
 def get_devices(x_api_key: Optional[str] = Header(None)):
     verify_api_key(x_api_key)
@@ -122,3 +195,4 @@ def get_telemetry(
         raise HTTPException(status_code=404, detail=f"No hay datos para '{device_id}'")
     
     return {"device_id": device_id, "readings": readings}
+"""
