@@ -29,8 +29,8 @@ services:
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUX_USER}
       - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUX_PSWD}
-      - DOCKER_INFLUXDB_INIT_ORG=project
-      - DOCKER_INFLUXDB_INIT_BUCKET=lunaris
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUX_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUX_BUCKET}
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUX_TOKEN}
     volumes:
       - influxdb_data:/var/lib/influxdb2
@@ -46,8 +46,8 @@ services:
       - MQTT_BROKER=mosquitto
       - INFLUX_URL=http://influxdb:8086
       - INFLUX_TOKEN=${INFLUX_TOKEN}
-      - INFLUX_ORG=project
-      - INFLUX_BUCKET=lunaris
+      - INFLUX_ORG=${INFLUX_ORG}
+      - INFLUX_BUCKET=${INFLUX_BUCKET}
     restart: on-failure
     networks:
       - lunaris-internal-network
@@ -59,10 +59,11 @@ services:
     ports:
       - "5000:5000"
     environment:
+      - API_KEY=${API_KEY}
       - INFLUX_URL=http://influxdb:8086
-      - INFLUX_TOKEN=mi-token-secreto
-      - INFLUX_ORG=esei
-      - INFLUX_BUCKET=iot_data
+      - INFLUX_TOKEN=${INFLUX_TOKEN}
+      - INFLUX_ORG=${INFLUX_ORG}
+      - INFLUX_BUCKET=${INFLUX_BUCKET}
     networks:
       - lunaris-internal-network
       

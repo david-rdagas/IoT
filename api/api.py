@@ -1,19 +1,21 @@
 from fastapi import FastAPI, Header, HTTPException
 from typing import Optional
-import datetime
+from datetime import datetime
 import json
 import os
 from influxdb_client import InfluxDBClient
+from dotenv import load_dotenv
 
+load_dotenv()
 
 app = FastAPI(title="IoT Pipeline API", version="1.0")
-VALID_API_KEY = os.environ.get("API_KEY", "0000")
+VALID_API_KEY = os.getenv("API_KEY")
 
 # --- Conexión InfluxDB ---
-INFLUX_URL = os.environ.get("INFLUX_URL", "http://localhost:8086")
-INFLUX_TOKEN = os.environ.get("INFLUX_TOKEN", "pic-lab-token-2026")
-INFLUX_ORG = os.environ.get("INFLUX_ORG", "esei")
-INFLUX_BUCKET = os.environ.get("INFLUX_BUCKET", "iot_data")
+INFLUX_URL = os.getenv("INFLUX_URL")
+INFLUX_TOKEN = os.getenv("INFLUX_TOKEN")
+INFLUX_ORG = os.getenv("INFLUX_ORG")
+INFLUX_BUCKET = os.getenv("INFLUX_BUCKET")
 
 influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
 query_api = influx_client.query_api()
@@ -23,6 +25,8 @@ def verify_api_key(x_api_key: Optional[str] = Header(None)):
     """Verifica que el header X-API-Key está presente y es correcto."""
     if x_api_key is None or x_api_key != VALID_API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized: API key inválida o ausente")
+    else:
+        print("Api key validada!")
 
 
 def validate_range(from_ts: Optional[str], to_ts: Optional[str]) -> tuple[str, str]:
@@ -50,6 +54,7 @@ def validate_range(from_ts: Optional[str], to_ts: Optional[str]) -> tuple[str, s
                 status_code=400,
                 detail="to_ts inválido. Usa formato ISO 8601: 2026-03-01T12:00:00Z"
             )
+    print("Rango valido!")
     return start, stop
 
 
@@ -57,6 +62,7 @@ def run_query(flux: str, empty_detail: str) -> list:
     """Ejecuta una query Flux y lanza 404 si no hay resultados."""
     try:
         tables = query_api.query(flux, org=INFLUX_ORG)
+        print("Query ejecutada!")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error consultando InfluxDB: {e}")
 
